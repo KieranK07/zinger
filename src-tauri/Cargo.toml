@@ -29,6 +29,8 @@ sha2 = "0.11.0"
 refinery = { version = "0.9.2", features = ["rusqlite"] }
 rusqlite = { version = "0.39", features = ["bundled", "chrono"] }
 hex = "0.4.3"
+# time 0.3.48's blanket From<T: ModifierValue> impl conflicts (E0119) with cookie/tauri-utils; pin until fixed upstream.
+time = "=0.3.47"
 
 [dev-dependencies]
 tokio = { version = "1.52.3", features = ["macros", "rt"] }

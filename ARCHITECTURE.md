@@ -25,6 +25,8 @@ Core (Rust, src-tauri/src/)
 
 **Dedup: hash, not similarity (for now).** `sha256(normalized_title | price/5-bucket)` truncated to 128 bits. Normalization lowercases and strips punctuation; the $5 price bucket absorbs trivial price edits. This catches the dominant case — the same item cross-posted with cosmetic title differences. Image perceptual hashing (phash) is planned for M2 when real image URLs flow; title+price+location similarity remains the documented fallback for image-less sources.
 
+> **Known-fragile:** the $5 price bucket is a step function. Identical cross-posts whose prices straddle a bucket boundary do not dedup, while a larger gap inside one bucket does. With `round(price/5)` the boundaries sit at $2.50 offsets: $97 vs $98 lands in buckets 19 vs 20 (no dedup), yet $98 vs $102 both land in 20 (dedups). Accepted for M1. The fix is perceptual image hashing (phash) in M2: same photo ⇒ duplicate regardless of price drift; the title/price hash stays as the fallback for image-less listings.
+
 **Fixtures are embedded (`include_str!`).** The mock adapter compiles its fixture JSON into the binary, so dev builds, tests, and packaged apps behave identically with no resource-path handling. Real adapter parser tests (M2) will follow the same pattern with saved HTML pages.
 
 **Settings are plain key-value rows; API keys are not settings.** The `settings` table stores non-secret config (fees, intervals, thresholds). BYOK API keys (M5) go to the OS keychain via the Tauri keyring plugin — never the DB, never logs.
