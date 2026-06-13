@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Facebook Marketplace sidecar for Nexus.
+// Facebook Marketplace sidecar for Zinger.
 //
 // Spawned on demand by the Rust FB adapter; exits when its task is done. It
 // is the ONLY place FB session cookies and an automation-driven browser

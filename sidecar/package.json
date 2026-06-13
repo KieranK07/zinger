@@ -1,9 +1,9 @@
 {
-  "name": "nexus-fb-sidecar",
+  "name": "zinger-fb-sidecar",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Facebook Marketplace browser-automation sidecar for Nexus. Spawned on demand by the FB adapter; never loaded when FB is disabled.",
+  "description": "Facebook Marketplace browser-automation sidecar for Zinger. Spawned on demand by the FB adapter; never loaded when FB is disabled.",
   "dependencies": {
     "playwright": "1.60.0"
   }

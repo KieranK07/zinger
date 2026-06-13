@@ -14,7 +14,7 @@ const MIN_DELAY_MS: u64 = 5_000;
 const MAX_DELAY_MS: u64 = 15_000;
 
 /// Honest user agent: identifies the tool, doesn't pretend to be a browser.
-const USER_AGENT: &str = "Nexus/0.1 (personal marketplace search tool; conservative rate limits)";
+const USER_AGENT: &str = "Zinger/0.1 (personal marketplace search tool; conservative rate limits)";
 
 pub struct CraigslistAdapter {
     client: reqwest::Client,

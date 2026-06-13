@@ -16,7 +16,7 @@ use tauri::Manager;
 /// Where the FB sidecar (Node + Playwright) lives. Overridable for packaged
 /// builds; in dev it sits beside src-tauri in the repo.
 fn sidecar_dir() -> std::path::PathBuf {
-    if let Ok(dir) = std::env::var("NEXUS_SIDECAR_DIR") {
+    if let Ok(dir) = std::env::var("ZINGER_SIDECAR_DIR") {
         return dir.into();
     }
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -33,7 +33,7 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .expect("no app data dir")
-                .join("nexus.db");
+                .join("zinger.db");
             let conn = db::open(&db_path)?;
 
             let all_settings = settings::get_all(&conn).unwrap_or_default();
@@ -42,7 +42,7 @@ pub fn run() {
                 .cloned()
                 .filter(|s| !s.trim().is_empty());
 
-            // FB shared state: profile lives beside nexus.db; flags restored
+            // FB shared state: profile lives beside zinger.db; flags restored
             // from settings. The sidecar/Chromium are NOT touched here — they
             // load only when the adapter actually runs.
             let profile_dir = app

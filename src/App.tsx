@@ -19,7 +19,7 @@ export default function App() {
     <div className="flex h-screen">
       <nav className="flex w-44 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950 p-3">
         <div className="mb-6 px-2 text-lg font-bold tracking-tight text-zinc-100">
-          Nexus
+          Zinger
         </div>
         {NAV.map(({ id, label }) => (
           <button

@@ -10,7 +10,7 @@ const TOKEN_URL: &str = "https://api.ebay.com/identity/v1/oauth2/token";
 const BROWSE_URL: &str = "https://api.ebay.com/buy/browse/v1/item_summary/search";
 const OAUTH_SCOPE: &str = "https://api.ebay.com/oauth/api_scope";
 
-pub const KEYRING_SERVICE: &str = "nexus";
+pub const KEYRING_SERVICE: &str = "zinger";
 pub const KEYRING_CLIENT_ID: &str = "ebay_client_id";
 pub const KEYRING_CLIENT_SECRET: &str = "ebay_client_secret";
 

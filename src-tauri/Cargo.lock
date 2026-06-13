@@ -2443,32 +2443,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
-name = "nexus"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "chrono",
- "hex",
- "image",
- "image_hasher",
- "keyring",
- "rand 0.10.1",
- "refinery",
- "reqwest",
- "rusqlite",
- "scraper",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "tauri",
- "tauri-build",
- "tauri-plugin-opener",
- "thiserror 2.0.18",
- "time",
- "tokio",
-]
-
-[[package]]
 name = "num-complex"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6116,6 +6090,32 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "zinger"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "hex",
+ "image",
+ "image_hasher",
+ "keyring",
+ "rand 0.10.1",
+ "refinery",
+ "reqwest",
+ "rusqlite",
+ "scraper",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-opener",
+ "thiserror 2.0.18",
+ "time",
+ "tokio",
 ]
 
 [[package]]

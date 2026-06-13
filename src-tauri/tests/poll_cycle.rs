@@ -3,10 +3,10 @@
 //! image/phash enrichment is disabled via PollOptions (NO_NET) and the
 //! only adapters used are fixture-backed or synthetic.
 
-use nexus_lib::adapters::{mock::MockAdapter, AdapterRegistry};
-use nexus_lib::db;
-use nexus_lib::models::{AdapterError, AdapterStatus, RateLimitPolicy, RawListing, SearchSpec};
-use nexus_lib::poll::{self, PollOptions};
+use zinger_lib::adapters::{mock::MockAdapter, AdapterRegistry};
+use zinger_lib::db;
+use zinger_lib::models::{AdapterError, AdapterStatus, RateLimitPolicy, RawListing, SearchSpec};
+use zinger_lib::poll::{self, PollOptions};
 use std::sync::Mutex;
 
 fn setup() -> (Mutex<rusqlite::Connection>, AdapterRegistry) {
@@ -66,7 +66,7 @@ async fn missing_search_is_an_error_not_a_panic() {
 struct FailingAdapter;
 
 #[async_trait::async_trait]
-impl nexus_lib::adapters::MarketAdapter for FailingAdapter {
+impl zinger_lib::adapters::MarketAdapter for FailingAdapter {
     fn id(&self) -> &'static str {
         "failing"
     }
@@ -76,7 +76,7 @@ impl nexus_lib::adapters::MarketAdapter for FailingAdapter {
     async fn search(
         &self,
         _spec: &SearchSpec,
-        _ctx: &nexus_lib::adapters::SearchContext,
+        _ctx: &zinger_lib::adapters::SearchContext,
     ) -> Result<Vec<RawListing>, AdapterError> {
         Err(AdapterError::Blocked("simulated block".into()))
     }
@@ -91,7 +91,7 @@ impl nexus_lib::adapters::MarketAdapter for FailingAdapter {
 struct NotConfiguredAdapter;
 
 #[async_trait::async_trait]
-impl nexus_lib::adapters::MarketAdapter for NotConfiguredAdapter {
+impl zinger_lib::adapters::MarketAdapter for NotConfiguredAdapter {
     fn id(&self) -> &'static str {
         "unconfigured"
     }
@@ -101,7 +101,7 @@ impl nexus_lib::adapters::MarketAdapter for NotConfiguredAdapter {
     async fn search(
         &self,
         _spec: &SearchSpec,
-        _ctx: &nexus_lib::adapters::SearchContext,
+        _ctx: &zinger_lib::adapters::SearchContext,
     ) -> Result<Vec<RawListing>, AdapterError> {
         panic!("must never be called when not configured");
     }

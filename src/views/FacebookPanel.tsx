@@ -18,7 +18,7 @@ function TosDialog({ onAccept, onCancel }: { onAccept: () => void; onCancel: () 
             <strong> your own account</strong>, logged in by you, entirely at your own risk.
           </li>
           <li>
-            Nexus minimizes automation signals and rate-limits hard, but this{" "}
+            Zinger minimizes automation signals and rate-limits hard, but this{" "}
             <strong>lowers, not eliminates</strong>, the risk of detection or account
             restriction.
           </li>

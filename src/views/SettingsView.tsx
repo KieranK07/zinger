@@ -163,7 +163,7 @@ export function SettingsView() {
       <section className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
         <h2 className="mb-1 text-sm font-semibold text-zinc-300">AI (optional, BYOK)</h2>
         <p className="text-xs text-zinc-500">
-          Coming in M5. Nexus is fully functional without AI; keys will be stored in the OS
+          Coming in M5. Zinger is fully functional without AI; keys will be stored in the OS
           keychain, never in the database.
         </p>
       </section>

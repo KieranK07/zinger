@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn migrations_are_idempotent_on_reopen() {
-        let dir = std::env::temp_dir().join(format!("nexus-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("zinger-test-{}", std::process::id()));
         let path = dir.join("test.db");
         let _ = std::fs::remove_file(&path);
         {
