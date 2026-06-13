@@ -3,9 +3,11 @@ pub mod commands;
 pub mod db;
 pub mod models;
 pub mod pipeline;
+pub mod poll;
+pub mod scheduler;
 pub mod settings;
 
-use adapters::{mock::MockAdapter, AdapterRegistry};
+use adapters::{craigslist::CraigslistAdapter, ebay::EbayAdapter, AdapterRegistry};
 use commands::AppState;
 use std::sync::Mutex;
 use tauri::Manager;
@@ -22,15 +24,23 @@ pub fn run() {
                 .join("nexus.db");
             let conn = db::open(&db_path)?;
 
+            let craigslist_site = settings::get_all(&conn)
+                .ok()
+                .and_then(|s| s.get("craigslist_site").cloned())
+                .filter(|s| !s.trim().is_empty());
+
             let mut registry = AdapterRegistry::new();
-            registry.register(Box::new(MockAdapter::new()));
-            // M2: registry.register(Box::new(CraigslistAdapter::new()));
-            // M2: registry.register(Box::new(EbayAdapter::new()));
+            registry.register(Box::new(CraigslistAdapter::new(craigslist_site)));
+            registry.register(Box::new(EbayAdapter::new()));
+            // Mock data would pollute real searches; keep it to dev builds.
+            #[cfg(debug_assertions)]
+            registry.register(Box::new(adapters::mock::MockAdapter::new()));
 
             app.manage(AppState {
                 db: Mutex::new(conn),
                 registry,
             });
+            scheduler::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -44,6 +54,9 @@ pub fn run() {
             commands::get_settings,
             commands::set_setting,
             commands::adapter_health,
+            commands::set_ebay_credentials,
+            commands::ebay_credentials_status,
+            commands::test_ebay_connection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,11 +1,23 @@
+pub mod craigslist;
+pub mod ebay;
 pub mod mock;
 
 use crate::models::{AdapterError, AdapterStatus, RateLimitPolicy, RawListing, SearchSpec};
 use async_trait::async_trait;
+use std::collections::HashSet;
+
+/// Cross-cycle knowledge the poll layer hands to adapters so they can avoid
+/// redundant work — e.g. Craigslist skips detail-page fetches for listings
+/// we already have. Adapters never touch the DB themselves.
+#[derive(Debug, Default)]
+pub struct SearchContext {
+    /// source_ids already stored for this adapter's source.
+    pub known_source_ids: HashSet<String>,
+}
 
 /// The contract every marketplace source implements. Sources are expected to
 /// be fragile (HTML changes, blocks); errors from one adapter must never
-/// affect another, so the registry isolates each call.
+/// affect another, so the poll layer isolates each call.
 #[async_trait]
 pub trait MarketAdapter: Send + Sync {
     /// Stable identifier, e.g. "ebay", "craigslist", "mock".
@@ -14,7 +26,11 @@ pub trait MarketAdapter: Send + Sync {
     /// Human-readable name for the UI.
     fn display_name(&self) -> &'static str;
 
-    async fn search(&self, spec: &SearchSpec) -> Result<Vec<RawListing>, AdapterError>;
+    async fn search(
+        &self,
+        spec: &SearchSpec,
+        ctx: &SearchContext,
+    ) -> Result<Vec<RawListing>, AdapterError>;
 
     fn health(&self) -> AdapterStatus;
 
@@ -23,14 +39,6 @@ pub trait MarketAdapter: Send + Sync {
 
 pub struct AdapterRegistry {
     adapters: Vec<Box<dyn MarketAdapter>>,
-}
-
-/// Result of running one adapter within a poll cycle. Failures are data, not
-/// control flow: the cycle reports them and moves on.
-#[derive(Debug)]
-pub struct AdapterRun {
-    pub adapter_id: &'static str,
-    pub result: Result<Vec<RawListing>, AdapterError>,
 }
 
 impl AdapterRegistry {
@@ -44,17 +52,6 @@ impl AdapterRegistry {
 
     pub fn adapters(&self) -> &[Box<dyn MarketAdapter>] {
         &self.adapters
-    }
-
-    /// Run every adapter against the spec. Each adapter's failure is captured
-    /// in its own AdapterRun; one source going down never blocks the rest.
-    pub async fn search_all(&self, spec: &SearchSpec) -> Vec<AdapterRun> {
-        let mut runs = Vec::with_capacity(self.adapters.len());
-        for adapter in &self.adapters {
-            let result = adapter.search(spec).await;
-            runs.push(AdapterRun { adapter_id: adapter.id(), result });
-        }
-        runs
     }
 }
 

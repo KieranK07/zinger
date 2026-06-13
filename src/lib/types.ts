@@ -15,6 +15,8 @@ export interface SavedSearch {
   price_ceiling: number | null;
   enabled: boolean;
   notify_score_threshold: number | null;
+  /** null = use the global poll_interval_minutes setting */
+  poll_interval_minutes: number | null;
 }
 
 export interface SearchInput {
@@ -26,6 +28,7 @@ export interface SearchInput {
   lng: number | null;
   radius_km: number;
   price_ceiling: number | null;
+  poll_interval_minutes: number | null;
 }
 
 export interface Listing {
@@ -54,6 +57,7 @@ export interface Listing {
 
 export type AdapterStatus =
   | { state: "ok" }
+  | { state: "not_configured"; reason: string }
   | { state: "degraded"; reason: string }
   | { state: "disabled"; reason: string };
 
@@ -66,10 +70,13 @@ export interface AdapterInfo {
 export interface AdapterRunReport {
   adapter_id: string;
   fetched: number;
+  /** present when the adapter was skipped (not configured / backing off) */
+  skipped: string | null;
   error: string | null;
 }
 
 export interface RunReport {
+  search_id: number;
   adapters: AdapterRunReport[];
   inserted: number;
   duplicates_skipped: number;

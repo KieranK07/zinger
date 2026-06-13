@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { api } from "../lib/api";
 import type { Listing, RunReport, SavedSearch } from "../lib/types";
 import { ListingCard } from "../components/ListingCard";
@@ -30,6 +31,17 @@ export function DealsFeed() {
   }, [selectedId]);
 
   useEffect(refresh, [refresh]);
+
+  // Background scheduler finished a cycle: refresh if it was our search.
+  useEffect(() => {
+    const unlisten = listen<RunReport>("poll-completed", (event) => {
+      setLastRun(event.payload);
+      if (event.payload.search_id === selectedId) refresh();
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [selectedId, refresh]);
 
   const runNow = async () => {
     if (selectedId == null) return;

@@ -20,4 +20,8 @@ export const api = {
   getSettings: () => invoke<Record<string, string>>("get_settings"),
   setSetting: (key: string, value: string) => invoke<void>("set_setting", { key, value }),
   adapterHealth: () => invoke<AdapterInfo[]>("adapter_health"),
+  setEbayCredentials: (clientId: string, clientSecret: string) =>
+    invoke<void>("set_ebay_credentials", { clientId, clientSecret }),
+  ebayCredentialsStatus: () => invoke<boolean>("ebay_credentials_status"),
+  testEbayConnection: () => invoke<string>("test_ebay_connection"),
 };

@@ -1,4 +1,4 @@
-use super::MarketAdapter;
+use super::{MarketAdapter, SearchContext};
 use crate::models::{AdapterError, AdapterStatus, RateLimitPolicy, RawListing, SearchSpec};
 use async_trait::async_trait;
 
@@ -36,7 +36,11 @@ impl MarketAdapter for MockAdapter {
         "Mock (fixtures)"
     }
 
-    async fn search(&self, spec: &SearchSpec) -> Result<Vec<RawListing>, AdapterError> {
+    async fn search(
+        &self,
+        spec: &SearchSpec,
+        _ctx: &SearchContext,
+    ) -> Result<Vec<RawListing>, AdapterError> {
         let all = Self::load_fixtures()?;
         let terms: Vec<String> = spec
             .keywords
@@ -101,21 +105,27 @@ mod tests {
     #[tokio::test]
     async fn fixtures_parse_and_return_all_for_empty_query() {
         let adapter = MockAdapter::new();
-        let results = adapter.search(&spec("", None)).await.unwrap();
+        let results = adapter.search(&spec("", None), &SearchContext::default()).await.unwrap();
         assert_eq!(results.len(), 12);
     }
 
     #[tokio::test]
     async fn keyword_filter_matches_title_and_description() {
         let adapter = MockAdapter::new();
-        let results = adapter.search(&spec("dewalt", None)).await.unwrap();
+        let results = adapter
+            .search(&spec("dewalt", None), &SearchContext::default())
+            .await
+            .unwrap();
         assert_eq!(results.len(), 2); // the cross-posted drill pair
     }
 
     #[tokio::test]
     async fn price_ceiling_filters() {
         let adapter = MockAdapter::new();
-        let results = adapter.search(&spec("", Some(100.0))).await.unwrap();
+        let results = adapter
+            .search(&spec("", Some(100.0)), &SearchContext::default())
+            .await
+            .unwrap();
         assert!(results.iter().all(|l| l.price <= 100.0));
         assert!(!results.is_empty());
     }

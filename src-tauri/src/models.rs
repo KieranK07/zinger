@@ -14,6 +14,8 @@ pub struct SavedSearch {
     pub price_ceiling: Option<f64>,
     pub enabled: bool,
     pub notify_score_threshold: Option<f64>,
+    /// None = use the global poll_interval_minutes setting.
+    pub poll_interval_minutes: Option<i64>,
 }
 
 /// What an adapter needs to execute a search. Decoupled from SavedSearch so
@@ -93,6 +95,10 @@ pub struct RawListing {
     pub images: Vec<String>,
     pub posted_at: Option<String>,
     pub condition: Option<Condition>,
+    /// Perceptual hash of the first image, filled in by the poll layer
+    /// (adapters return None — they don't download images).
+    #[serde(default)]
+    pub phash: Option<String>,
 }
 
 /// A normalized, deduplicated listing as stored and shown in the UI.
@@ -126,6 +132,9 @@ pub struct Listing {
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum AdapterStatus {
     Ok,
+    /// Adapter needs user-supplied configuration (e.g. eBay API keys) and is
+    /// silently inert until it gets it. Not an error state.
+    NotConfigured { reason: String },
     Degraded { reason: String },
     Disabled { reason: String },
 }

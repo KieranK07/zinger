@@ -11,6 +11,7 @@ const EMPTY: SearchInput = {
   lng: null,
   radius_km: 40,
   price_ceiling: null,
+  poll_interval_minutes: null,
 };
 
 export function SearchManager() {
@@ -58,6 +59,7 @@ export function SearchManager() {
       lng: s.lng,
       radius_km: s.radius_km,
       price_ceiling: s.price_ceiling,
+      poll_interval_minutes: s.poll_interval_minutes,
     });
   };
 
@@ -139,6 +141,22 @@ export function SearchManager() {
                 setForm({ ...form, category: e.target.value === "" ? null : e.target.value })
               }
               placeholder="tools"
+            />
+          </div>
+          <div>
+            <label className={label}>Poll interval (min, optional)</label>
+            <input
+              type="number"
+              className={field}
+              value={form.poll_interval_minutes ?? ""}
+              placeholder="global default"
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  poll_interval_minutes:
+                    e.target.value === "" ? null : Math.max(1, Number(e.target.value)),
+                })
+              }
             />
           </div>
         </div>

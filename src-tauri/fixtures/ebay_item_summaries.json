@@ -1,0 +1,86 @@
+{
+  "href": "https://api.ebay.com/buy/browse/v1/item_summary/search?q=dewalt+drill&limit=50&offset=0",
+  "total": 2143,
+  "limit": 50,
+  "offset": 0,
+  "itemSummaries": [
+    {
+      "itemId": "v1|110554038305|0",
+      "title": "DeWalt DCD791B 20V MAX XR Brushless 1/2\" Drill Driver (Tool Only)",
+      "leafCategoryIds": ["20786"],
+      "categories": [
+        { "categoryId": "20786", "categoryName": "Cordless Drills" }
+      ],
+      "image": {
+        "imageUrl": "https://i.ebayimg.com/images/g/abcdAAOSw1234/s-l225.jpg"
+      },
+      "price": { "value": "89.99", "currency": "USD" },
+      "itemHref": "https://api.ebay.com/buy/browse/v1/item/v1%7C110554038305%7C0",
+      "seller": { "username": "toolseller99", "feedbackPercentage": "99.6", "feedbackScore": 12043 },
+      "condition": "Used",
+      "conditionId": "3000",
+      "thumbnailImages": [
+        { "imageUrl": "https://i.ebayimg.com/images/g/abcdAAOSw1234/s-l140.jpg" }
+      ],
+      "buyingOptions": ["FIXED_PRICE", "BEST_OFFER"],
+      "itemWebUrl": "https://www.ebay.com/itm/110554038305",
+      "itemLocation": { "city": "Kent", "stateOrProvince": "WA", "postalCode": "980**", "country": "US" },
+      "additionalImages": [
+        { "imageUrl": "https://i.ebayimg.com/images/g/wxyzAAOSw5678/s-l225.jpg" }
+      ],
+      "adultOnly": false,
+      "legacyItemId": "110554038305",
+      "availableCoupons": false,
+      "itemCreationDate": "2026-06-09T18:24:11.000Z",
+      "topRatedBuyingExperience": true,
+      "priorityListing": false,
+      "listingMarketplaceId": "EBAY_US"
+    },
+    {
+      "itemId": "v1|110554038306|0",
+      "title": "DEWALT 20V Max Cordless Drill/Driver Kit DCD771C2 with 2 Batteries NEW",
+      "leafCategoryIds": ["20786"],
+      "categories": [
+        { "categoryId": "20786", "categoryName": "Cordless Drills" }
+      ],
+      "image": {
+        "imageUrl": "https://i.ebayimg.com/images/g/efghAAOSw9012/s-l225.jpg"
+      },
+      "price": { "value": "118.50", "currency": "USD" },
+      "itemHref": "https://api.ebay.com/buy/browse/v1/item/v1%7C110554038306%7C0",
+      "seller": { "username": "bigboxoutlet", "feedbackPercentage": "98.9", "feedbackScore": 88231 },
+      "condition": "New",
+      "conditionId": "1000",
+      "buyingOptions": ["FIXED_PRICE"],
+      "itemWebUrl": "https://www.ebay.com/itm/110554038306",
+      "itemLocation": { "city": "Spokane", "stateOrProvince": "WA", "postalCode": "992**", "country": "US" },
+      "adultOnly": false,
+      "legacyItemId": "110554038306",
+      "availableCoupons": false,
+      "itemCreationDate": "2026-06-11T02:10:45.000Z",
+      "topRatedBuyingExperience": false,
+      "priorityListing": false,
+      "listingMarketplaceId": "EBAY_US"
+    },
+    {
+      "itemId": "v1|110554038307|0",
+      "title": "Dewalt drill no battery UNTESTED for parts",
+      "leafCategoryIds": ["20786"],
+      "categories": [
+        { "categoryId": "20786", "categoryName": "Cordless Drills" }
+      ],
+      "price": { "value": "25.00", "currency": "USD" },
+      "itemHref": "https://api.ebay.com/buy/browse/v1/item/v1%7C110554038307%7C0",
+      "seller": { "username": "garagecleanout", "feedbackPercentage": "100.0", "feedbackScore": 87 },
+      "condition": "For parts or not working",
+      "conditionId": "7000",
+      "buyingOptions": ["AUCTION"],
+      "itemWebUrl": "https://www.ebay.com/itm/110554038307",
+      "itemLocation": { "postalCode": "970**", "country": "US" },
+      "adultOnly": false,
+      "legacyItemId": "110554038307",
+      "availableCoupons": false,
+      "listingMarketplaceId": "EBAY_US"
+    }
+  ]
+}

@@ -4,11 +4,12 @@
 UI (React + TS + Tailwind, src/)
         ⇅ Tauri commands (src-tauri/src/commands.rs)
 Core (Rust, src-tauri/src/)
-        ├─ AdapterRegistry → [MockAdapter]            adapters/
-        ├─ Dedup + normalization pipeline             pipeline.rs
-        ├─ SQLite store (rusqlite + refinery)         db.rs, migrations/
-        ├─ Settings                                   settings.rs
-        ├─ Scheduler (M2)
+        ├─ AdapterRegistry → [Craigslist, eBay, Mock*] adapters/   (*dev builds only)
+        ├─ Poll layer: isolation, backoff, phash       poll.rs
+        ├─ Scheduler (per-search interval + jitter)    scheduler.rs
+        ├─ Dedup + normalization pipeline              pipeline.rs
+        ├─ SQLite store (rusqlite + refinery)          db.rs, migrations/
+        ├─ Settings                                    settings.rs
         ├─ Valuation engine (M3)
         └─ Notifier (M4)
 ```
@@ -33,6 +34,19 @@ Core (Rust, src-tauri/src/)
 
 **Score is honest about its absence.** Valuation lands in M3; until then the UI shows "score —" rather than a fake number, and the schema already reserves `valuations.score = NULL` to mean "unpriceable" rather than zero.
 
+**Craigslist: parse the no-JS static fallback, never a headless browser.** CL search pages are JS-rendered, but they ship a server-rendered `li.cl-static-search-result` fallback carrying url/title/price/location. We parse that (one request per search), then fetch detail pages only for listings we haven't seen, capped at 8 per cycle with randomized 5–15s delays. New listings beyond the cap are deliberately dropped that cycle — the next poll picks them up, keeping every cycle's footprint bounded. A page with neither results nor the fallback markup is a loud `Parse` error (layout change or block), never a silent "no matches".
+
+**`SearchContext` keeps adapters DB-free.** Craigslist needs to know which listings are already stored to avoid re-fetching their detail pages forever. Rather than handing adapters a DB connection, the poll layer passes `known_source_ids` in a context struct. Adapters stay pure fetch+parse; cross-cycle knowledge stays in one place.
+
+**Failure bookkeeping lives in the poll layer, not adapters.** `poll.rs` owns `adapter_state`: consecutive failures, exponential backoff (5 min base, ×2 per failure, blocks start at 20 min, cap 24 h), and `disabled` status after 3 consecutive failures. Adapters just return typed errors (`Blocked` vs `Network` vs `Parse`); the policy reaction is centralized and identically applied to every source. NotConfigured adapters (eBay without keys) are skipped before any of this — silence, not errors.
+
+**phash enrichment happens in the poll layer, after search, before ingest.** Adapters return image URLs; `poll.rs` downloads the first image (10 s timeout, 1 MB cap), computes an 8×8 gradient hash (`image_hasher`), and ingest treats hamming distance ≤ 6 as "same photo ⇒ duplicate" — which closes the price-bucket-boundary hole documented in M1 (verified by test: $97 vs $98 cross-post with the same photo dedups). Any enrichment failure degrades to the title/price fallback hash. Tests disable enrichment entirely (`PollOptions { fetch_images: false }`) — no network in tests, ever.
+
+**keyring v3, not v4.** eBay credentials live in the OS keychain via the `keyring` crate. v4 was rejected because it pulls a full SQLite engine (turso) through `db-keystore` — absurd weight for two secrets; v3 binds the platform-native stores directly.
+
+**Scheduler keeps due-times in memory.** One tokio task ticks per minute; each enabled search is due after its interval (per-search column, else global setting) ±20% jitter. Nothing is persisted: a restart re-polls early at worst, and ingest dedups the overlap. The mock adapter is registered only in debug builds so it can't pollute real searches.
+
 ## Milestone log
 
 - **M1 (done):** app boots; migrations create `searches/listings/comps/valuations/user_actions/adapter_state/settings`; mock adapter → pipeline → DB → deals feed renders; settings persist; 13 tests (no network).
+- **M2 (done):** live Craigslist adapter (fixture-first parser; real fixtures captured 2026-06-12); eBay Browse adapter (BYOK keychain creds, clean no-op unconfigured, test-connection); poll layer with per-adapter backoff/auto-disable; background scheduler with jitter; phash dedup closing the bucket-boundary hole; 34 offline tests + 1 manual live smoke (passed: 8 listings).

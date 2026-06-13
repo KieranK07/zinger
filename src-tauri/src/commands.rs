@@ -1,6 +1,6 @@
-use crate::adapters::AdapterRegistry;
-use crate::models::{AdapterStatus, Condition, Listing, SavedSearch, SearchSpec};
-use crate::pipeline;
+use crate::adapters::{ebay, AdapterRegistry};
+use crate::models::{AdapterStatus, Condition, Listing, SavedSearch};
+use crate::poll;
 use crate::settings;
 use rusqlite::{params, Connection, Row};
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,13 @@ fn search_from_row(row: &Row) -> rusqlite::Result<SavedSearch> {
         price_ceiling: row.get("price_ceiling")?,
         enabled: row.get("enabled")?,
         notify_score_threshold: row.get("notify_score_threshold")?,
+        poll_interval_minutes: row.get("poll_interval_minutes")?,
     })
+}
+
+/// Shared with the poll layer and scheduler.
+pub fn get_search(conn: &Connection, id: i64) -> rusqlite::Result<SavedSearch> {
+    conn.query_row("SELECT * FROM searches WHERE id=?1", params![id], search_from_row)
 }
 
 #[tauri::command]
@@ -59,14 +65,17 @@ pub struct SearchInput {
     pub lng: Option<f64>,
     pub radius_km: f64,
     pub price_ceiling: Option<f64>,
+    #[serde(default)]
+    pub poll_interval_minutes: Option<i64>,
 }
 
 #[tauri::command]
 pub fn create_search(state: State<'_, AppState>, input: SearchInput) -> CmdResult<i64> {
     let conn = lock_db(&state)?;
     conn.execute(
-        "INSERT INTO searches (name, keywords, category, location_text, lat, lng, radius_km, price_ceiling)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO searches (name, keywords, category, location_text, lat, lng, radius_km,
+            price_ceiling, poll_interval_minutes)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
             input.name,
             input.keywords,
@@ -75,7 +84,8 @@ pub fn create_search(state: State<'_, AppState>, input: SearchInput) -> CmdResul
             input.lat,
             input.lng,
             input.radius_km,
-            input.price_ceiling
+            input.price_ceiling,
+            input.poll_interval_minutes
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -88,7 +98,7 @@ pub fn update_search(state: State<'_, AppState>, search: SavedSearch) -> CmdResu
     conn.execute(
         "UPDATE searches SET name=?2, keywords=?3, category=?4, location_text=?5, lat=?6,
             lng=?7, radius_km=?8, price_ceiling=?9, enabled=?10, notify_score_threshold=?11,
-            updated_at=datetime('now')
+            poll_interval_minutes=?12, updated_at=datetime('now')
          WHERE id=?1",
         params![
             search.id,
@@ -101,7 +111,8 @@ pub fn update_search(state: State<'_, AppState>, search: SavedSearch) -> CmdResu
             search.radius_km,
             search.price_ceiling,
             search.enabled,
-            search.notify_score_threshold
+            search.notify_score_threshold,
+            search.poll_interval_minutes
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -118,69 +129,12 @@ pub fn delete_search(state: State<'_, AppState>, id: i64) -> CmdResult<()> {
 
 // ---------- polling ----------
 
-#[derive(Debug, Serialize)]
-pub struct AdapterRunReport {
-    pub adapter_id: String,
-    pub fetched: usize,
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct RunReport {
-    pub adapters: Vec<AdapterRunReport>,
-    pub inserted: usize,
-    pub duplicates_skipped: usize,
-    pub already_known: usize,
-}
-
-/// Run all adapters for one saved search and ingest results. Async adapter
-/// work happens before the DB lock is taken, so the UI never blocks on I/O.
+/// Run all adapters for one saved search and ingest results. The heavy
+/// lifting (isolation, backoff, phash enrichment) lives in poll.rs and is
+/// shared with the background scheduler.
 #[tauri::command]
-pub async fn run_search(state: State<'_, AppState>, search_id: i64) -> CmdResult<RunReport> {
-    let spec: SearchSpec = {
-        let conn = lock_db(&state)?;
-        let search = conn
-            .query_row(
-                "SELECT * FROM searches WHERE id=?1",
-                params![search_id],
-                search_from_row,
-            )
-            .map_err(|e| format!("search {search_id} not found: {e}"))?;
-        SearchSpec::from(&search)
-    };
-
-    let runs = state.registry.search_all(&spec).await;
-
-    let mut report = RunReport {
-        adapters: Vec::new(),
-        inserted: 0,
-        duplicates_skipped: 0,
-        already_known: 0,
-    };
-    let conn = lock_db(&state)?;
-    for run in runs {
-        match run.result {
-            Ok(raw) => {
-                let fetched = raw.len();
-                let stats =
-                    pipeline::ingest(&conn, search_id, raw).map_err(|e| e.to_string())?;
-                report.inserted += stats.inserted;
-                report.duplicates_skipped += stats.duplicates_skipped;
-                report.already_known += stats.already_known;
-                report.adapters.push(AdapterRunReport {
-                    adapter_id: run.adapter_id.to_string(),
-                    fetched,
-                    error: None,
-                });
-            }
-            Err(e) => report.adapters.push(AdapterRunReport {
-                adapter_id: run.adapter_id.to_string(),
-                fetched: 0,
-                error: Some(e.to_string()),
-            }),
-        }
-    }
-    Ok(report)
+pub async fn run_search(state: State<'_, AppState>, search_id: i64) -> CmdResult<poll::RunReport> {
+    poll::run_poll_cycle(&state.db, &state.registry, search_id).await
 }
 
 // ---------- listings ----------
@@ -276,16 +230,65 @@ pub struct AdapterInfo {
     pub status: AdapterStatus,
 }
 
+/// Trait-level health (e.g. eBay NotConfigured) merged with runtime state
+/// from adapter_state (backoff/disable bookkeeping owned by the poll layer).
+/// Runtime trouble wins over a trait-level "Ok".
 #[tauri::command]
 pub fn adapter_health(state: State<'_, AppState>) -> CmdResult<Vec<AdapterInfo>> {
+    let conn = lock_db(&state)?;
     Ok(state
         .registry
         .adapters()
         .iter()
-        .map(|a| AdapterInfo {
-            id: a.id().to_string(),
-            display_name: a.display_name().to_string(),
-            status: a.health(),
+        .map(|a| {
+            let mut status = a.health();
+            if matches!(status, AdapterStatus::Ok) {
+                let db_state: Option<(String, Option<String>)> = conn
+                    .query_row(
+                        "SELECT status, status_detail FROM adapter_state
+                         WHERE adapter_id = ?1 AND backoff_until > datetime('now')",
+                        params![a.id()],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )
+                    .ok();
+                if let Some((db_status, detail)) = db_state {
+                    let reason = detail.unwrap_or_else(|| "recent failures".into());
+                    status = if db_status == "disabled" {
+                        AdapterStatus::Disabled { reason }
+                    } else {
+                        AdapterStatus::Degraded { reason }
+                    };
+                }
+            }
+            AdapterInfo {
+                id: a.id().to_string(),
+                display_name: a.display_name().to_string(),
+                status,
+            }
         })
         .collect())
+}
+
+// ---------- eBay credentials (OS keychain, never the DB) ----------
+
+#[tauri::command]
+pub fn set_ebay_credentials(client_id: String, client_secret: String) -> CmdResult<()> {
+    ebay::store_credentials(client_id.trim(), client_secret.trim())
+}
+
+#[tauri::command]
+pub fn ebay_credentials_status() -> bool {
+    ebay::stored_credentials().is_some()
+}
+
+/// Fetches an OAuth token with the stored keys. Success message only —
+/// secrets and tokens are never returned to the UI.
+#[tauri::command]
+pub async fn test_ebay_connection() -> CmdResult<String> {
+    let adapter = ebay::EbayAdapter::new();
+    adapter
+        .fetch_token()
+        .await
+        .map(|_| "Connected: eBay accepted your API keys.".to_string())
+        .map_err(|e| e.to_string())
 }

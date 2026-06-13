@@ -4,17 +4,24 @@ A local-first desktop app for second-hand marketplace arbitrage: find underprice
 
 **Personal tool, not a service.** No accounts, no backend, no telemetry. Your data and API keys never leave your machine.
 
-## Status: M1 (skeleton)
+## Status: M2 (real data)
 
 Working now:
-- Tauri 2 desktop app with SQLite storage and migrations
-- Saved searches (keyword, location, radius, price ceiling)
-- Pluggable marketplace adapter interface with a fixture-backed mock adapter
-- Cross-post deduplication (normalized title + price bucket hashing)
-- Deals feed, search manager, and settings views; save/hide listing actions
-- One example search pre-seeded
+- **Live Craigslist adapter**: polite parsing of public search pages (one request per search, detail pages for new listings only, randomized 5–15s delays, exponential backoff, auto-disable after repeated blocks)
+- **eBay adapter (BYOK)**: official Browse API with your own developer keys, stored in the OS keychain. Without keys it shows "not configured" and stays silent. Settings has a "Test connection" button
+- **Background scheduler**: per-search polling interval (or a global default) with jitter; the deals feed refreshes live when a cycle completes
+- **Smarter dedup**: perceptual image hashing catches cross-posts even when prices differ; title+price hashing remains the fallback for image-less listings
+- Saved searches, deals feed, search manager, settings; save/hide actions; SQLite with versioned migrations
 
-Coming next (M2): live Craigslist and eBay adapters, background polling with backoff.
+Coming next (M2.5): Facebook Marketplace adapter — off by default, explicit ToS warning, your own session. Then M3: valuation from eBay sold comps.
+
+### eBay setup (optional but recommended)
+1. Create a (free) developer account at developer.ebay.com and an app with production keys.
+2. Settings → eBay API keys: paste the App ID (client ID) and Cert ID (client secret), Save, then Test connection.
+3. Keys go to your OS keychain — never the database, never logs.
+
+### Craigslist site
+The adapter derives the CL subdomain from each search's location ("Seattle, WA" → `seattle.craigslist.org`). Metros whose site name isn't the city name (e.g. the Bay Area's `sfbay`) can set it explicitly via Settings → "Craigslist site" (restart to apply).
 
 ## Honest constraints — read this
 
