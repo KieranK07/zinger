@@ -158,4 +158,6 @@ pub enum AdapterError {
     Blocked(String),
     #[error("adapter disabled: {0}")]
     Disabled(String),
+    #[error("authentication required: {0}")]
+    Auth(String),
 }

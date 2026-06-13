@@ -31,7 +31,7 @@ rusqlite = { version = "0.39", features = ["bundled", "chrono"] }
 hex = "0.4.3"
 # time 0.3.48's blanket From<T: ModifierValue> impl conflicts (E0119) with cookie/tauri-utils; pin until fixed upstream.
 time = "=0.3.47"
-tokio = { version = "1.52.3", features = ["macros", "rt", "time"] }
+tokio = { version = "1.52.3", features = ["io-util", "macros", "process", "rt", "time"] }
 scraper = "0.27.0"
 rand = "0.10.1"
 image_hasher = "3.1.1"

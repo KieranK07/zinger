@@ -1,3 +1,4 @@
+use crate::adapters::facebook::{self, FbProgress, FbShared};
 use crate::adapters::{ebay, AdapterRegistry};
 use crate::models::{AdapterStatus, Condition, Listing, SavedSearch};
 use crate::poll;
@@ -5,12 +6,13 @@ use crate::settings;
 use rusqlite::{params, Connection, Row};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Mutex;
-use tauri::State;
+use std::sync::{Arc, Mutex};
+use tauri::{Emitter, State};
 
 pub struct AppState {
     pub db: Mutex<Connection>,
     pub registry: AdapterRegistry,
+    pub fb: Arc<FbShared>,
 }
 
 type CmdResult<T> = Result<T, String>;
@@ -291,4 +293,94 @@ pub async fn test_ebay_connection() -> CmdResult<String> {
         .await
         .map(|_| "Connected: eBay accepted your API keys.".to_string())
         .map_err(|e| e.to_string())
+}
+
+// ---------- Facebook Marketplace (experimental, opt-in) ----------
+
+/// Snapshot of FB adapter state for the Settings UI. No secrets — the session
+/// lives only in the on-disk browser profile.
+#[derive(Debug, Serialize)]
+pub struct FbStatus {
+    pub enabled: bool,
+    pub tos_accepted: bool,
+    pub chromium_installed: bool,
+    pub logged_in: bool,
+    pub session_expired: bool,
+    pub disabled_until: Option<String>,
+    pub max_pages: u32,
+}
+
+#[tauri::command]
+pub fn fb_status(state: State<'_, AppState>) -> FbStatus {
+    let s = state.fb.state.lock().unwrap();
+    FbStatus {
+        enabled: s.enabled,
+        tos_accepted: s.tos_accepted,
+        chromium_installed: s.chromium_installed,
+        logged_in: s.logged_in,
+        session_expired: s.session_expired,
+        disabled_until: s.disabled_until.map(|t| t.to_rfc3339()),
+        max_pages: *state.fb.max_pages.lock().unwrap(),
+    }
+}
+
+/// One-time acceptance of the FB ToS warning. Gate for first enable.
+#[tauri::command]
+pub fn fb_accept_tos(state: State<'_, AppState>) -> CmdResult<()> {
+    state.fb.state.lock().unwrap().tos_accepted = true;
+    let conn = lock_db(&state)?;
+    settings::set(&conn, "fb_tos_accepted", "1").map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn fb_set_enabled(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
+    {
+        let mut s = state.fb.state.lock().unwrap();
+        if enabled && !s.tos_accepted {
+            return Err("accept the Facebook terms warning first".into());
+        }
+        s.enabled = enabled;
+    }
+    let conn = lock_db(&state)?;
+    settings::set(&conn, "fb_enabled", if enabled { "1" } else { "0" })
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn fb_set_max_pages(state: State<'_, AppState>, max_pages: u32) -> CmdResult<()> {
+    let clamped = max_pages.clamp(1, 10);
+    *state.fb.max_pages.lock().unwrap() = clamped;
+    let conn = lock_db(&state)?;
+    settings::set(&conn, "fb_max_pages", &clamped.to_string()).map_err(|e| e.to_string())
+}
+
+/// Download Chromium for the sidecar, streaming progress to the UI via the
+/// `fb-progress` event. Long-running; spawned only on explicit user action.
+#[tauri::command]
+pub async fn fb_install_chromium(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> CmdResult<()> {
+    facebook::install_chromium(state.fb.clone(), move |p: FbProgress| {
+        let _ = app.emit("fb-progress", p);
+    })
+    .await
+}
+
+/// Open a visible browser window to facebook.com for manual login. Resolves
+/// when the session cookie appears (logged in) or times out.
+#[tauri::command]
+pub async fn fb_login(state: State<'_, AppState>) -> CmdResult<String> {
+    let result = facebook::login(state.fb.clone()).await;
+    // Persist the logged-in flag on success.
+    if result.as_deref() == Ok("logged_in") {
+        let conn = lock_db(&state)?;
+        let _ = settings::set(&conn, "fb_logged_in", "1");
+    }
+    result
+}
+
+#[tauri::command]
+pub async fn fb_refresh_chromium(state: State<'_, AppState>) -> CmdResult<bool> {
+    facebook::refresh_chromium_status(&state.fb).await
 }

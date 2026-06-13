@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AdapterInfo,
+  FbStatus,
   Listing,
   RunReport,
   SavedSearch,
@@ -24,4 +25,11 @@ export const api = {
     invoke<void>("set_ebay_credentials", { clientId, clientSecret }),
   ebayCredentialsStatus: () => invoke<boolean>("ebay_credentials_status"),
   testEbayConnection: () => invoke<string>("test_ebay_connection"),
+  fbStatus: () => invoke<FbStatus>("fb_status"),
+  fbAcceptTos: () => invoke<void>("fb_accept_tos"),
+  fbSetEnabled: (enabled: boolean) => invoke<void>("fb_set_enabled", { enabled }),
+  fbSetMaxPages: (maxPages: number) => invoke<void>("fb_set_max_pages", { maxPages }),
+  fbInstallChromium: () => invoke<void>("fb_install_chromium"),
+  fbLogin: () => invoke<string>("fb_login"),
+  fbRefreshChromium: () => invoke<boolean>("fb_refresh_chromium"),
 };

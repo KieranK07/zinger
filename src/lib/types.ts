@@ -67,6 +67,22 @@ export interface AdapterInfo {
   status: AdapterStatus;
 }
 
+export interface FbStatus {
+  enabled: boolean;
+  tos_accepted: boolean;
+  chromium_installed: boolean;
+  logged_in: boolean;
+  session_expired: boolean;
+  disabled_until: string | null;
+  max_pages: number;
+}
+
+export interface FbProgress {
+  kind: "download" | "login" | "done" | "error";
+  pct: number | null;
+  message: string | null;
+}
+
 export interface AdapterRunReport {
   adapter_id: string;
   fetched: number;

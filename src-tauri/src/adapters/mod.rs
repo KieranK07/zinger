@@ -1,5 +1,6 @@
 pub mod craigslist;
 pub mod ebay;
+pub mod facebook;
 pub mod mock;
 
 use crate::models::{AdapterError, AdapterStatus, RateLimitPolicy, RawListing, SearchSpec};

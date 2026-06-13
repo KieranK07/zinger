@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { AdapterInfo } from "../lib/types";
+import { FacebookPanel } from "./FacebookPanel";
 
 const EDITABLE: { key: string; label: string; hint: string }[] = [
   { key: "platform_fee_pct", label: "Platform fee %", hint: "Deducted from est. resale (eBay ≈ 13)" },
@@ -156,6 +157,8 @@ export function SettingsView() {
           {ebayMessage && <div className="text-xs text-zinc-400">{ebayMessage}</div>}
         </div>
       </section>
+
+      <FacebookPanel />
 
       <section className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
         <h2 className="mb-1 text-sm font-semibold text-zinc-300">AI (optional, BYOK)</h2>

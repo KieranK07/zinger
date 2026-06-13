@@ -1,0 +1,80 @@
+<!--
+  Representative Facebook Marketplace search-results snapshot.
+
+  AUTHORED, NOT A LIVE CAPTURE. Capturing a real page needs a logged-in
+  account, which we don't scrape for fixtures. Facebook obfuscates class names
+  (randomized, build-specific), so this fixture and the parser anchor ONLY on
+  the two stable signals that survive rebuilds:
+    1. listing card  = <a href="/marketplace/item/<id>/...">
+    2. price         = visible text starting with a currency symbol
+  Title/location/image are positional heuristics within the card.
+
+  Before trusting LIVE output, these selectors MUST be revalidated against a
+  real logged-in DOM snapshot (save one via the sidecar, drop it here, re-green
+  the tests). Until then the live path is experimental, exactly as labeled.
+-->
+<html>
+<body>
+<div role="main">
+  <a href="/marketplace/" role="link"><span>Marketplace</span></a>
+
+  <div>
+    <a href="/marketplace/item/1122334455/?ref=search" role="link">
+      <div>
+        <img src="https://scontent.xx.fbcdn.net/v/t45.5328-4/receiver_600x600.jpg" alt="" />
+        <div>
+          <span dir="auto">$120</span>
+          <span dir="auto">Vintage Pioneer SX-780 Receiver</span>
+          <span dir="auto">Seattle, WA</span>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div>
+    <a href="/marketplace/item/2233445566/" role="link">
+      <div>
+        <img src="https://scontent.xx.fbcdn.net/v/t45.5328-4/drill_600x600.jpg" alt="" />
+        <div>
+          <span dir="auto">$65</span>
+          <span dir="auto">DeWalt 20V Cordless Drill - like new</span>
+          <span dir="auto">Bellevue, WA</span>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div>
+    <a href="/marketplace/item/3344556677/?ref=search&referral_code=null" role="link">
+      <div>
+        <img src="https://scontent.xx.fbcdn.net/v/t45.5328-4/switch_600x600.jpg" alt="" />
+        <div>
+          <span dir="auto">$1,200</span>
+          <span dir="auto">Herman Miller Aeron Chair Size B</span>
+          <span dir="auto">Redmond, WA</span>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <!-- A free item: price text is "Free", not a currency amount. -->
+  <div>
+    <a href="/marketplace/item/4455667788/" role="link">
+      <div>
+        <img src="https://scontent.xx.fbcdn.net/v/t45.5328-4/sofa_600x600.jpg" alt="" />
+        <div>
+          <span dir="auto">Free</span>
+          <span dir="auto">Used sectional sofa - must pick up</span>
+          <span dir="auto">Tacoma, WA</span>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <!-- Noise that must be ignored: a profile link and a category link. -->
+  <a href="/marketplace/you/selling/" role="link"><span>Selling</span></a>
+  <a href="/marketplace/category/propertyrentals/" role="link"><span>Property Rentals</span></a>
+  <a href="/marketplace/seattle/" role="link"><span>See more in Seattle</span></a>
+</div>
+</body>
+</html>
