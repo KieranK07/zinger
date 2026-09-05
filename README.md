@@ -1,61 +1,148 @@
 # Zinger
 
-A local-first desktop app for second-hand marketplace arbitrage: find underpriced items near you, estimate resale value from comparable sold prices, and rank listings by expected profit.
+A local-first desktop app that watches saved second-hand searches across
+Craigslist, eBay and (opt-in) Facebook Marketplace, folds the cross-posts
+together, and keeps the whole thing in a SQLite file on your own machine.
+Tauri 2, Rust core, React UI.
 
-**Personal tool, not a service.** No accounts, no backend, no telemetry. Your data and API keys never leave your machine.
+No accounts, no backend, no telemetry. API keys go to the OS keychain.
 
-## Status: M2.5 (Facebook Marketplace, experimental)
+## Why it exists
 
-Working now:
-- **Live Craigslist adapter**: polite parsing of public search pages (one request per search, detail pages for new listings only, randomized 5–15s delays, exponential backoff, auto-disable after repeated blocks)
-- **eBay adapter (BYOK)**: official Browse API with your own developer keys, stored in the OS keychain. Without keys it shows "not configured" and stays silent. Settings has a "Test connection" button
-- **Facebook Marketplace (experimental, off by default)**: an opt-in adapter that drives *your own* logged-in session via a private, isolated browser sidecar. See the ToS warning below before enabling
-- **Background scheduler**: per-search polling interval (or a global default) with jitter; the deals feed refreshes live when a cycle completes
-- **Smarter dedup**: perceptual image hashing catches cross-posts even when prices differ; title+price hashing remains the fallback for image-less listings
-- Saved searches, deals feed, search manager, settings; save/hide actions; SQLite with versioned migrations
+Hunting for underpriced second-hand gear means running the same three or four
+searches on the same three or four sites, over and over, and mentally
+deduplicating the seller who posted the same drill to all of them. That is a
+polling loop, which is a thing computers are good at. Every hosted tool that
+does it wants an account and keeps your search history; this one is a desktop
+binary with a SQLite file next to it.
 
-Coming next (M3): valuation from eBay sold comps; FB and Craigslist listings score against those comps like every other source.
+The interesting part turned out not to be the polling. It was that the three
+sources have completely different access stories — eBay has a documented API,
+Craigslist has no API and has sued scrapers, Facebook has no API and actively
+fights automation — and the app has to keep working when any one of them
+breaks, blocks, or is switched off.
 
-### eBay setup (optional but recommended)
-1. Create a (free) developer account at developer.ebay.com and an app with production keys.
-2. Settings → eBay API keys: paste the App ID (client ID) and Cert ID (client secret), Save, then Test connection.
-3. Keys go to your OS keychain — never the database, never logs.
+## How it works
 
-### Craigslist site
-The adapter derives the CL subdomain from each search's location ("Seattle, WA" → `seattle.craigslist.org`). Metros whose site name isn't the city name (e.g. the Bay Area's `sfbay`) can set it explicitly via Settings → "Craigslist site" (restart to apply).
+Every source implements one trait: `search(spec, ctx) -> Result<Vec<RawListing>>`,
+plus `health()` and `rate_limit_policy()`. Adapters do nothing but fetch and
+parse — they never see the database and never decide policy.
 
-## Honest constraints — read this
+Everything else lives in one layer above them:
 
-**Marketplace access is the riskiest part of this app, by design.**
+- **`poll.rs` owns failure.** It runs each adapter in isolation, so one source
+  returning a `Parse` error is a row in the run report, not an aborted cycle.
+  Consecutive failures drive exponential backoff (5 min base, doubling, capped
+  at 24 h) recorded in an `adapter_state` table; three in a row marks the source
+  disabled until the window lapses. An adapter with no credentials is skipped
+  before any of this — silence, not an error.
+- **Dedup is a perceptual image hash first.** The poll layer downloads each new
+  listing's first image (10 s timeout, 1 MB cap), computes an 8x8 gradient hash,
+  and ingest treats a hamming distance of 6 or less as the same photo, so a
+  cross-post dedups even when the two prices differ. The original scheme —
+  `sha256(normalized title | price rounded to $5)` — is a step function with a
+  hole at the bucket boundary ($97 and $98 land in different buckets and do not
+  dedup, while $98 and $102 land in the same one and do). It survives as the
+  fallback for listings with no images.
+- **`scheduler.rs` ticks once a minute**, running any search whose interval
+  (per-search column, else the global setting) has elapsed, ±20% jitter so the
+  traffic isn't a metronome. Due times are in memory only: a restart re-polls
+  early at worst, and ingest dedups the overlap.
+- **Craigslist parses the no-JS fallback.** The search pages are JS-rendered but
+  ship a server-side `li.cl-static-search-result` list carrying url, title,
+  price and location. One request per search, then detail pages only for
+  listings not already stored, capped at 8 per cycle with randomised 5-15 s
+  delays. A page with neither results nor the fallback markup is a loud error,
+  never a silent "no matches".
+- **Facebook runs in a separate process.** A Node + Playwright sidecar drives a
+  persistent Chromium profile and pipes rendered HTML back over newline-
+  delimited JSON; parsing stays in Rust against a fixture like every other
+  adapter. The sidecar is spawned only while the adapter is enabled and killed
+  otherwise, so nothing browser-shaped loads when Facebook is off.
+- **SQLite via rusqlite + refinery**, one connection behind a mutex. Adapter
+  I/O always completes before the lock is taken, so a slow source never blocks
+  the UI on it.
 
-- **eBay** has official APIs. Zinger uses them with *your own* developer keys. This is the reliable path and powers valuation comps.
-- **Craigslist** has no API and has litigated against scrapers. The Craigslist adapter parses public search pages with conservative randomized delays (5–15s), an honest user agent, aggressive caching, and automatic backoff/disable on failures. Using it may still violate Craigslist's ToS. It is your decision and your risk.
-- **Facebook Marketplace** has no public API, and automated access **violates Facebook's Terms of Service.** The adapter is **off by default** and gated behind a one-time warning you must explicitly accept. It uses **your own account**, which you log into yourself in a visible browser window; Zinger never sees or stores your credentials, and the session lives only in a private browser profile on your machine. To reduce (not eliminate) detection risk it minimizes automation signals, waits a randomized 20–45s between page loads, caps pages per cycle (default 3), and **auto-disables for 24 hours after two consecutive challenges/blocks** — a challenge stops it immediately rather than retrying. **None of this removes the risk that Facebook detects automation and restricts or bans your account. Enabling it is your decision and your risk.** Enabling triggers a one-time ~341 MB private-browser download. The live search path is experimental: Facebook's obfuscated, frequently-changing markup means the parser can break without warning and silently return fewer or no results until updated.
-- **OfferUp** prohibits scraping and has no public API. Not implemented — only the adapter interface exists.
+Longer version, including the decisions that were rejected and why, is in
+[ARCHITECTURE.md](ARCHITECTURE.md).
 
-The Facebook browser sidecar is a **separate process spawned only when the adapter is enabled** and torn down when disabled; it shares nothing with the main app, and while Facebook is off it does not load at all.
+## Marketplace access — read this before enabling anything
 
-Every adapter degrades independently: one source breaking or blocking never takes down the others or the app.
+The three sources are not equivalent, and the difference is legal, not
+technical.
 
-**Valuation needs no AI.** Estimates come from median/IQR statistics over comparable sold listings. AI (M5) is an optional, bring-your-own-key refinement layer — model extraction from messy titles, scam red-flags — and the app is fully functional with zero AI configured. If no comps exist, a listing is marked "unpriceable"; Zinger never fabricates a value.
+- **eBay** has an official API. Zinger uses the Browse API with your own
+  developer keys, stored in the OS keychain.
+- **Craigslist** has no API and has litigated against scrapers. The adapter
+  parses public search pages with randomised delays, an honest user agent that
+  identifies the tool rather than impersonating a browser, and automatic
+  backoff. Using it may still breach Craigslist's terms.
+- **Facebook Marketplace has no public API, and automated access to it breaches
+  Facebook's Terms of Service.** The adapter is off by default and behind a
+  one-time acceptance gate. It drives your own account, which you log into
+  yourself in a visible browser window — Zinger never sees or stores your
+  password, and the session lives only in a private browser profile on your
+  machine. It waits a randomised 20-45 s between page loads, caps pages per
+  cycle at 3, stops immediately on a challenge, and self-disables for 24 hours
+  after two consecutive ones. None of that removes the risk that Facebook
+  detects the automation and restricts or bans the account you are using.
+  Enabling it is your call and your risk.
+- **OfferUp** prohibits scraping and has no public API. Not implemented; only
+  the adapter interface exists.
 
-## Development
+## Running it
 
-Prereqs: Rust (1.80+), Node 20+, and the [Tauri 2 system dependencies](https://tauri.app/start/prerequisites/).
+Needs Rust 1.80+, Node 20+, and the
+[Tauri 2 system dependencies](https://tauri.app/start/prerequisites/).
 
 ```sh
 npm install
-npm run tauri dev      # run the app
+npm run tauri dev      # run it
 npm run tauri build    # package for your platform
 
-cd src-tauri
-cargo test             # Rust unit + integration tests (no network, fixture-based)
+cd src-tauri && cargo test   # 44 offline tests; 1 live smoke test is #[ignore]d
 ```
 
-The Facebook adapter shells out to a Node sidecar in `sidecar/`. It only matters if you enable FB; install its deps with `cd sidecar && npm install`. Chromium itself is fetched lazily on first FB-enable, not at dev-setup time.
+The database goes in the platform app-data directory —
+`~/Library/Application Support/com.zinger.app/zinger.db` on macOS.
 
-The SQLite database lives in your platform's app-data directory (e.g. `~/Library/Application Support/com.zinger.app/zinger.db` on macOS); the Facebook browser profile, when used, sits beside it in `fb-profile/`.
+eBay is optional but is the only source with a supported API: create a free
+account at developer.ebay.com, make an app with production keys, then paste the
+App ID and Cert ID into Settings and hit Test connection. They go to the
+keychain, never the database and never the logs.
 
-## Architecture
+The Facebook sidecar has its own `npm install` in `sidecar/`, and only matters
+if you enable Facebook. Chromium (~341 MB) is downloaded on first enable rather
+than bundled, so the base app stays small for the people who never touch it.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md). Short version: React UI ⇄ Tauri commands ⇄ Rust core (adapter registry → dedup pipeline → SQLite; scheduler and valuation engine land in M2/M3).
+## Status
+
+Working: live Craigslist and eBay adapters, the poll layer with per-adapter
+backoff, the background scheduler, phash dedup, saved searches, the deals feed
+with save/hide, settings, and versioned SQLite migrations. `cargo test` runs 44
+tests and passes; none of them touch the network, because the parsers are tested
+against HTML and JSON fixtures captured from the real sites. The one test that
+would hit Craigslist for real is marked `#[ignore]`.
+
+Not working yet:
+
+- **There is no valuation.** The whole point — rank listings by expected profit
+  against sold comps — is not built. The UI shows `score —` rather than a made-up
+  number, and the schema already treats `valuations.score = NULL` as
+  "unpriceable" rather than zero. The `comps` and `valuations` tables exist and
+  are empty.
+- **The Facebook live search path is experimental.** The parser is anchored on
+  `/marketplace/item/` links and currency text against a saved fixture, but
+  Facebook's markup is obfuscated and changes often, so it can start returning
+  fewer results or none without warning. The selectors have not been revalidated against a
+  real logged-in snapshot, and the one manual live smoke test needs a Facebook
+  account, so it has not been run.
+- The Craigslist site slug is derived from the search location text, which is
+  right for most metros and wrong for the renamed ones (the Bay Area is
+  `sfbay`); there is a settings override for those.
+- No notifications, no AI anything. Valuation, when it lands, is median/IQR over
+  comparable sold listings — statistics, not a model.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

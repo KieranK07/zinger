@@ -4,14 +4,15 @@
 UI (React + TS + Tailwind, src/)
         ⇅ Tauri commands (src-tauri/src/commands.rs)
 Core (Rust, src-tauri/src/)
-        ├─ AdapterRegistry → [Craigslist, eBay, Mock*] adapters/   (*dev builds only)
+        ├─ AdapterRegistry → [Craigslist, eBay, Facebook†, Mock*]  adapters/
+        │                    (†opt-in, sidecar; *dev builds only)
         ├─ Poll layer: isolation, backoff, phash       poll.rs
         ├─ Scheduler (per-search interval + jitter)    scheduler.rs
         ├─ Dedup + normalization pipeline              pipeline.rs
         ├─ SQLite store (rusqlite + refinery)          db.rs, migrations/
         ├─ Settings                                    settings.rs
-        ├─ Valuation engine (M3)
-        └─ Notifier (M4)
+        ├─ Valuation engine                            not built (M3)
+        └─ Notifier                                    not built (M4)
 ```
 
 ## Decisions
