@@ -7,6 +7,8 @@ Tauri 2, Rust core, React UI.
 
 No accounts, no backend, no telemetry. API keys go to the OS keychain.
 
+![Settings view: valuation/polling config, adapter transparency note, and eBay BYOK key entry](docs/img/settings-view.png)
+
 ## Why it exists
 
 Hunting for underpriced second-hand gear means running the same three or four
