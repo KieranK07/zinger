@@ -24,16 +24,22 @@ fn sidecar_dir() -> std::path::PathBuf {
         .join("sidecar")
 }
 
+/// Where zinger.db and the FB profile live. `ZINGER_DATA_DIR` points a dev
+/// run at a scratch directory instead of the real app-data dir.
+fn data_dir(app: &tauri::App) -> std::path::PathBuf {
+    if let Ok(dir) = std::env::var("ZINGER_DATA_DIR") {
+        return dir.into();
+    }
+    app.path().app_data_dir().expect("no app data dir")
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let db_path = app
-                .path()
-                .app_data_dir()
-                .expect("no app data dir")
-                .join("zinger.db");
+            let data_dir = data_dir(app);
+            let db_path = data_dir.join("zinger.db");
             let conn = db::open(&db_path)?;
 
             let all_settings = settings::get_all(&conn).unwrap_or_default();
@@ -45,11 +51,7 @@ pub fn run() {
             // FB shared state: profile lives beside zinger.db; flags restored
             // from settings. The sidecar/Chromium are NOT touched here — they
             // load only when the adapter actually runs.
-            let profile_dir = app
-                .path()
-                .app_data_dir()
-                .expect("no app data dir")
-                .join("fb-profile");
+            let profile_dir = data_dir.join("fb-profile");
             let fb = Arc::new(FbShared::new(profile_dir, sidecar_dir()));
             {
                 let mut s = fb.state.lock().unwrap();
