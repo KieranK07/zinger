@@ -59,6 +59,43 @@ Core (Rust, src-tauri/src/)
 
 **FB sidecar protocol & state machine.** The Rust adapter and the Node sidecar speak newline-delimited JSON over stdout (`status`/`install`/`login`/`search`; events `progress`/`installed`/`logged_in`/`page`/`done`/`challenge`/`not_logged_in`/`error`). Parsing stays pure Rust against fixtures (`fixtures/facebook_search.html`), same as every other adapter — the sidecar only ships rendered HTML. FB-specific health policy lives in the adapter, not the shared poll layer: a **challenge/checkpoint** stops the run immediately and, on the second consecutive one, self-disables for 24 h; a **login wall** (session expiry) returns `AdapterError::Auth` so health shows "re-login required" with a one-click re-auth — never a silent empty result. Non-runnable states (off / no ToS / no Chromium / 24 h-disabled) return `Ok(empty)` *before* any spawn, which is what makes the "browser doesn't load when disabled" guarantee hold (verified by unit test + a runtime boot check: no sidecar, Chromium, or profile dir appears while FB is off).
 
+## Marketplace access
+
+The three sources are not equivalent, and the difference is legal, not
+technical.
+
+- **eBay** has an official API. Zinger uses the Browse API with the user's own
+  developer keys, stored in the OS keychain.
+- **Craigslist** has no API and has litigated against scrapers. The adapter
+  parses public search pages with randomised delays, a user agent that
+  identifies the tool rather than impersonating a browser, and automatic
+  backoff. Using it may still breach Craigslist's terms.
+- **Facebook Marketplace has no public API, and automated access to it breaches
+  Facebook's Terms of Service.** The adapter is off by default and behind a
+  one-time acceptance gate. It drives the user's own account, logged into by
+  hand in a visible browser window; Zinger never sees or stores the password,
+  and the session lives only in a private browser profile on the machine. It
+  waits a randomised 20-45 s between page loads, caps pages per cycle at 3,
+  stops immediately on a challenge, and self-disables for 24 hours after two
+  consecutive ones. None of that removes the risk that Facebook detects the
+  automation and restricts or bans the account.
+- **OfferUp** prohibits scraping and has no public API. Not implemented; only
+  the adapter interface exists.
+
+The Settings view states the same thing next to each adapter:
+
+![Settings view: valuation/polling config, adapter transparency note, and eBay key entry](docs/img/settings-view.png)
+
+## Dedup in one paragraph
+
+A new listing's first image is downloaded (10 s timeout, 1 MB cap) and reduced
+to an 8x8 gradient hash; a hamming distance of 6 or less counts as the same
+photo, so a cross-post dedups even when the two prices differ. The original
+scheme, `sha256(normalized title | price rounded to $5)`, is a step function
+with a hole at the bucket boundary ($97 and $98 land in different buckets and do
+not dedup, while $98 and $102 share one and do). It survives only as the
+fallback for listings with no images.
+
 ## Milestone log
 
 - **M1 (done):** app boots; migrations create `searches/listings/comps/valuations/user_actions/adapter_state/settings`; mock adapter → pipeline → DB → deals feed renders; settings persist; 13 tests (no network).
